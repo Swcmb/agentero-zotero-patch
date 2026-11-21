@@ -1,0 +1,19 @@
+# 审计用的上游源码快照，不属于本插件交付物
+.sources/
+
+# 依赖与构建产物
+node_modules/
+lib/
+dist/
+*.tsbuildinfo
+
+# 运行时产物
+.dsh/
+receipts/
+artifacts/
+
+# 系统/编辑器
+.DS_Store
+*.log
+.idea/
+.vscode/
