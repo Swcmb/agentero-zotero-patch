@@ -1,7 +1,7 @@
 # Agentero Zotero Patch — 功能融合设计规格
 
 - 日期：2026-11-21
-- 状态：已通过头脑风暴确认，待用户审阅
+- 状态：已通过头脑风暴确认；经三轮自审修订（事实核对/一致性/歧义消除），待用户审阅
 - 来源设计：用户提供的 `agentero-zotero-integration-design (1).html`
 - 目标仓库：`D:/agentero-zotero-patch`（独立 Git 仓库）
 
@@ -45,7 +45,9 @@
 
 ```
 DSH 运行时（Cordis ctx）
-   │  cordis.patch.yml → insert: zotero-patch / zotero-patch-bridge / ...
+   │  cordis.patch.yml → insert: zotero-patch / zotero-patch-bridge /
+   │                             zotero-patch-sources（阶段 3 起挂载）
+   │                             [阶段 5 增补: -scholarly / -enrichment，默认关闭]
    ▼
 [1] 补丁入口层  index.ts                 注册组件、声明 inject、挂载服务与配置
    ▼
@@ -67,15 +69,22 @@ DSH 运行时（Cordis ctx）
 | --- | --- | --- |
 | `zotero-patch` | 核心服务 `ctx.zoteroPatch`：连接检测、统一工具注册、Sources 折叠 | 启用 |
 | `zotero-patch-bridge` | 可选探测 agentero 服务、决定是否复用其 PDF/笔记 | 启用 |
-| `zotero-patch-sources` | Sources 会话轨迹投影（会话事件增量折叠） | 启用 |
+| `zotero-patch-sources` | Sources 会话轨迹投影（会话事件增量折叠） | 阶段 3 起注册并启用；阶段 1-2 不挂载 |
 | `zotero-patch-scholarly` | 外部学术检索（阶段 5） | 关闭 |
 | `zotero-patch-enrichment` | 文档解析/语义排序（阶段 5） | 关闭 |
 
 依赖方向固定：bridge/sources/scholarly/enrichment → core；core 只通过纯接口槽调用增强能力，不反向依赖。组件卸载时撤槽、停止新准入、等待在途读取排空。
 
+### 4.3 桥接的可选探测与最小只读回退
+
+- **探测对象**：挂载时在 `ctx` 上探测 `agentero-host` 与 `agentero-library`（两包 `export const name` 即 Cordis 键）。探测失败不阻塞挂载。具体消费的服务接口面（vault/PDF/笔记的哪些方法）在实施计划阶段锁定，本插件不 import `agentero-dsh-*` 包，无版本 pin 依赖。
+- **复用路径**：探测成功时，Zotero 来源文献的证据与附件展示可走 agentero 已有 PDF/笔记能力。
+- **最小只读回退（明确定义）**：探测失败（未安装 agentero 或服务缺失）时，`research_*` 工具的 Zotero 能力**全部照常可用**：元数据/合集/标签、全文与批注检索、证据片段（文本 + 页码 + 附件定位）、引用导出均由本插件自有 wire 端点返回；**不提供** PDF 阅读器 UI 与笔记写入，证据以片段形式交付，Agent 可凭页码引用。此时本插件等价于一个纯 Zotero 只读增强，与 agentero 完全解耦。
+- 该回退同时覆盖"用户只装本插件、未装 agentero-dsh"的场景：安装顺序无关，能力不依赖 agentero 存在。
+
 ## 5. 统一工具契约
 
-阶段 1-3 注册 `research_*` 工具，参数含 `source?: "agentero" | "zotero"`，省略则跨库检索。
+阶段 1-3 注册 `research_*` 工具，参数含 `source?: "agentero" | "zotero"`。**阶段 1-2 该参数仅接受 `"zotero"`（Zotero 单源，schema 预留字段）；阶段 4 统一服务层就位后才接受跨库（省略 source 即跨库）与 `"agentero"` 源。**
 
 | 工具 | 阶段 | 职责 | 复用的 dsh-zotero 模块（源文件） |
 | --- | --- | --- | --- |
@@ -83,7 +92,7 @@ DSH 运行时（Cordis ctx）
 | `research_get` | 1 | 读取单篇元数据、摘要、笔记与附件信息 | `tools/get.ts`, `local/detail.ts` |
 | `research_get_batch` | 1 | 批量读取，逐条报告 | `tools/get-batch.ts`, `local/get-batch-domain.ts` |
 | `research_browse` | 1 | 浏览数据源、文库、合集、标签、保存搜索 | `tools/browse.ts`, `local/browse-domain.ts` |
-| `research_children` | 1 | 获取子条目（附件/笔记/批注） | `tools/child-records.ts`, `local/normalize-children.ts` |
+| `research_children` | 1 | 获取子条目（附件/笔记/批注） | `tools/child-records.ts`, `normalize-children.ts` |
 | `research_retrieve` | 2 | 全文/笔记/批注检索，返回片段/页码/来源定位 | `tools/retrieve.ts`, `local/retrieve.ts`, `local/retrieve-fulltext.ts`, `local/evidence-ranker.ts` |
 | `research_export` | 2 | 导出 BibTeX/BibLaTeX/RIS/CSL JSON/引用 | `tools/export.ts`, `local/export-domain.ts` |
 | `research_match_references` | 2 | 参考文献与库内条目匹配 | `tools/match-references.ts`, `local/match-references-domain.ts` |
@@ -94,7 +103,7 @@ DSH 运行时（Cordis ctx）
 ## 6. 数据流
 
 ### 6.1 读路径
-Agent 调 `research_*` → 工具层参数校验 → 统一服务层按 `source` 路由 → Zotero 侧经 transport 调用 Local API（loopback 23119）→ 归一化为统一 `PaperReference` → 返回带来源定位的结果。全文检索用 BM25（k1=1.2, b=0.75）；证据片段保留附件、Zotero 页码、匹配方式。Sources 组件旁路监听会话事件，只折叠读类工具与导出的成功事实，记录查询条件、实际读取的文献/笔记/附件、证据片段/页码/批注、导出与失败/取消操作、需审批的写入操作。
+Agent 调 `research_*` → 工具层参数校验 → 统一服务层按 `source` 路由（阶段 1-2 仅 Zotero 单源直达 transport；阶段 4 起经统一服务层跨库路由）→ Zotero 侧经 transport 调用 Local API（loopback 23119）→ 归一化为统一 `PaperReference` → 返回带来源定位的结果。全文检索用 BM25（k1=1.2, b=0.75）；证据片段保留附件、Zotero 页码、匹配方式。Sources 组件旁路监听会话事件，只折叠读类工具与导出的成功事实，记录查询条件、实际读取的文献/笔记/附件、证据片段/页码/批注、导出与失败/取消操作、需审批的写入操作。
 
 ### 6.2 写路径（阶段 1 不做；阶段 2+ 默认关闭）
 能力门 → 只读预检 → `ctx.approval.request` → 计划审查卡 → Local API → 回执核验（索引/身份/版本/字段一致，缺失返回 `committed-unverified` 且不重试）。写权限不继承 Agentero 授权；附件访问限定 Zotero 返回的合法路径；不引入任意 Shell 执行能力。
@@ -106,7 +115,7 @@ Agent 调 `research_*` → 工具层参数校验 → 统一服务层按 `source`
 | 连接 | Zotero 未运行 / 23119 未监听 / 本地 API 未开启 | 错误码 `ZOTERO_PATCH_UNREACHABLE`，提示开启"允许其他应用通信"，不重试风暴 |
 | 权限 | 写未授权 / 第三方上传未授权 | `ZOTERO_PATCH_WRITE_DENIED` / `ZOTERO_PATCH_EGRESS_DENIED`，不继承 agentero 授权 |
 | 数据 | 条目不存在 / 附件路径越界 / schema 不匹配 | 具体错误码，不降级返回错误数据 |
-| 降级 | agentero 服务不存在 / 语义模型缺失 | 走最小只读回退；语义缺失明确报错，不静默回退 BM25 |
+| 降级 | agentero 服务不存在 / 语义模型缺失 | 走最小只读回退（定义见 4.3）；语义缺失明确报错，不静默回退 BM25 |
 
 ## 8. 代码迁移原则与能力映射
 
@@ -145,6 +154,7 @@ Agent 调 `research_*` → 工具层参数校验 → 统一服务层按 `source`
 
 ## 12. 待实施计划阶段补齐
 
-- 两个上游仓库的固定 commit SHA。
+- 两个上游仓库的固定 commit SHA（`.sources/` 为 main 分支 zip 快照，实施计划第一步记录各仓库 HEAD SHA 并固定）。
 - 逐模块能力映射表（源功能/源文件/目标包/适配方式/测试用例）。
-- Node 24 本机可用性确认与切换方式。
+- **Node 24 处理（可执行步骤）**：实施计划第一步先核对构建用 Node 版本（`node --version`，PATH 中含多个 node 发行版）；若 < 24.9，则下载 Node 24 LTS 独立目录到 `D:/agentero-zotero-patch/.node24/`（不覆盖系统 Node），本仓库脚本统一通过该目录的 node/npm 执行；Zotero 本地 API 联调不受 Node 版本影响（HTTP 调用）。
+- bridge 消费 agentero 服务的具体接口面（4.3 所述）与统一面板数据契约的字段清单。
