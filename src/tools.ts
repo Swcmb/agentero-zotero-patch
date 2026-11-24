@@ -1,0 +1,68 @@
+import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { Context } from '@deepseek-ai/cordis'
+import type { ZoteroTransport } from './transport.js'
+import { researchHandlers } from './handlers.js'
+
+const SOURCE_PARAM = {
+  type: 'string',
+  enum: ['zotero'],
+  description: '阶段 1-2 仅支持 zotero',
+}
+
+/** DSH 适配层：唯一 import dsh-tools 的模块，负责注册 research_* 工具。 */
+export function registerResearchTools(ctx: Context, transport: ZoteroTransport): () => void {
+  const definitions = [
+    defineTool({
+      name: 'research_search',
+      description: '搜索 Zotero 文献库（默认只返回顶层父条目，避免附件混入）。',
+      parameters: {
+        query: { type: 'string', description: '关键词' },
+        source: SOURCE_PARAM,
+        tags: { type: 'array', items: { type: 'string' } },
+        collection: { type: 'string' },
+        qmode: { type: 'string', enum: ['metadata', 'everything'] },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        offset: { type: 'integer', minimum: 0 },
+      },
+      output: { schema: { type: 'object' } },
+      async execute(args: any) { return researchHandlers.search(transport, args) },
+    }),
+    defineTool({
+      name: 'research_get',
+      description: '按 Zotero key 读取单条文献元数据。',
+      parameters: { key: { type: 'string', minLength: 1 }, source: SOURCE_PARAM },
+      async execute(args: any) { return researchHandlers.get(transport, args) },
+    }),
+    defineTool({
+      name: 'research_get_batch',
+      description: '批量读取 Zotero 条目，逐条报告成功或失败。',
+      parameters: {
+        keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 50 },
+        source: SOURCE_PARAM,
+      },
+      async execute(args: any) { return researchHandlers.getBatch(transport, args) },
+    }),
+    defineTool({
+      name: 'research_browse',
+      description: '浏览 Zotero 合集与标签。',
+      parameters: {
+        kind: { type: 'string', enum: ['collections', 'tags'] },
+        source: SOURCE_PARAM,
+        limit: { type: 'integer' },
+      },
+      async execute(args: any) { return researchHandlers.browse(transport, args) },
+    }),
+    defineTool({
+      name: 'research_children',
+      description: '读取 Zotero 条目的附件、笔记或批注子条目。',
+      parameters: {
+        key: { type: 'string' },
+        kind: { type: 'string', enum: ['attachment', 'note', 'annotation'] },
+        source: SOURCE_PARAM,
+      },
+      async execute(args: any) { return researchHandlers.children(transport, args) },
+    }),
+  ]
+  const disposers = definitions.map((d) => ctx.tools!.register(d))
+  return () => disposers.forEach((dispose) => dispose())
+}
