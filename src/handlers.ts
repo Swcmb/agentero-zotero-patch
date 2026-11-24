@@ -9,23 +9,39 @@ import { retrieve } from './retrieve.js'
 import { exportCitation, type ExportFormat } from './export.js'
 import { matchReferences, type MatchTarget } from './match.js'
 import { changes } from './changes.js'
+import { getAgenteroAdapter } from './bridge.js'
+import { routeEnvelopes, routeSource } from './unified.js'
 
 /** 纯函数业务层：不 import 任何 DSH 包，便于用 node:test 直接测试。 */
 export const researchHandlers = {
   async search(transport: ZoteroTransport, args: any) {
-    const { path, params } = buildSearchRequest(args)
-    const { json, headers } = await transport.get(path, params)
-    const rows = args.qmode === 'everything' ? filterTop(json) : json
-    const items: PaperReference[] = rows.map((raw: any) => normalizeItem(raw))
-    return {
-      source: 'zotero' as const,
-      count: items.length,
-      items,
-      total: Number(headers.get('total-results') ?? items.length),
+    const adapter = getAgenteroAdapter()
+    const zoteroCall = async () => {
+      const { path, params } = buildSearchRequest(args)
+      const { json, headers } = await transport.get(path, params)
+      const rows = args.qmode === 'everything' ? filterTop(json) : json
+      const items: PaperReference[] = rows.map((raw: any) => normalizeItem(raw))
+      return {
+        source: 'zotero' as const,
+        count: items.length,
+        items,
+        total: Number(headers.get('total-results') ?? items.length),
+      }
     }
+    const agenteroCall = adapter ? async () => {
+      const rows = await adapter.search(args)
+      const items: PaperReference[] = rows.map((raw: any) => normalizeItem(raw, 'agentero'))
+      return { source: 'agentero' as const, count: items.length, items, total: items.length }
+    } : undefined
+    return routeEnvelopes(args.source, zoteroCall, agenteroCall)
   },
   async get(transport: ZoteroTransport, args: any) {
-    return getItem(transport, args.key)
+    const adapter = getAgenteroAdapter()
+    return routeSource(
+      args.source,
+      () => getItem(transport, args.key),
+      adapter ? async () => normalizeItem(await adapter.get(args), 'agentero') : undefined,
+    )
   },
   async getBatch(transport: ZoteroTransport, args: any) {
     return getBatch(transport, args.keys)

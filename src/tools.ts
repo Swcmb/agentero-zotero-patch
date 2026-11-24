@@ -5,8 +5,8 @@ import { researchHandlers } from './handlers.js'
 
 const SOURCE_PARAM = {
   type: 'string',
-  enum: ['zotero'],
-  description: '阶段 1-2 仅支持 zotero',
+  enum: ['zotero', 'agentero'],
+  description: '省略为跨库；zotero / agentero 为单源。agentero 未安装时指定该源会显式报错。',
 }
 
 /** DSH 适配层：唯一 import dsh-tools 的模块，负责注册 research_* 工具。 */

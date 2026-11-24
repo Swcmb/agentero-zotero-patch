@@ -7,3 +7,6 @@
     - id: zotero-patch-sources
       name: agentero-zotero-patch/sources
       config: {}
+    - id: zotero-patch-bridge
+      name: agentero-zotero-patch/bridge
+      config: {}
