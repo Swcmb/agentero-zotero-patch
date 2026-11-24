@@ -10,3 +10,11 @@
     - id: zotero-patch-bridge
       name: agentero-zotero-patch/bridge
       config: {}
+    - id: zotero-patch-scholarly
+      name: agentero-zotero-patch/scholarly
+      disabled: true
+      config: { enabled: false }
+    - id: zotero-patch-enrichment
+      name: agentero-zotero-patch/enrichment
+      disabled: true
+      config: { enabled: false }
