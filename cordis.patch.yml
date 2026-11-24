@@ -1,0 +1,6 @@
+# Agentero Zotero Patch —— 分阶段挂载行
+# 语义：向 DSH composition 插入本插件的组件行，与 agentero-dsh 并列挂载。
+- insert:
+    - id: zotero-patch
+      name: agentero-zotero-patch
+      config: {}
