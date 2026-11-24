@@ -4,3 +4,6 @@
     - id: zotero-patch
       name: agentero-zotero-patch
       config: {}
+    - id: zotero-patch-sources
+      name: agentero-zotero-patch/sources
+      config: {}
