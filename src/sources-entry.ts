@@ -5,11 +5,5 @@ export const name = 'zotero-patch-sources'
 export const inject: string[] = []
 
 export function apply(ctx: Context): void {
-  const ledger = createSourceLedger()
-  ctx.effect(() => {
-    ;(ctx as any).zoteroPatchSources = ledger
-    return () => {
-      delete (ctx as any).zoteroPatchSources
-    }
-  })
+  ctx.provide('zoteroPatchSources', createSourceLedger())
 }

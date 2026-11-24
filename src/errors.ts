@@ -8,6 +8,7 @@ export type ZoteroPatchErrorCode =
   | 'ZOTERO_PATCH_WRITE_DENIED'
   | 'ZOTERO_PATCH_EGRESS_DENIED'
   | 'ZOTERO_PATCH_AGENTERO_UNAVAILABLE'
+  | 'ZOTERO_PATCH_BAD_ARG'
   | 'ZOTERO_PATCH_UNEXPECTED'
 
 export class ZoteroPatchError extends Error {

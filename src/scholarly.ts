@@ -27,12 +27,7 @@ export const name = 'zotero-patch-scholarly'
 export const inject: string[] = []
 
 export function apply(ctx: Context, config: { enabled?: boolean } = {}): void {
-  ctx.effect(() => {
-    ;(ctx as any).zoteroPatchScholarly = {
-      assertEgressAllowed: (url: string) => assertEgressAllowed(url, config.enabled === true),
-    }
-    return () => {
-      delete (ctx as any).zoteroPatchScholarly
-    }
+  ctx.provide('zoteroPatchScholarly', {
+    assertEgressAllowed: (url: string) => assertEgressAllowed(url, config.enabled === true),
   })
 }

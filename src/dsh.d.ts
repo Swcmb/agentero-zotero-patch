@@ -1,6 +1,8 @@
 declare module '@deepseek-ai/cordis' {
   export interface Context {
     get<T = unknown>(name: string): T | undefined
+    /** 声明一个 service 属性；之后才允许 ctx[name] = value。返回 disposer，由 fiber 自动清理。 */
+    provide(name: string, value?: unknown): () => void
     on(event: string, listener: (...args: any[]) => void): () => void
     effect(fn: () => void | (() => void)): () => void
     tools?: { register(definition: unknown): () => void }
