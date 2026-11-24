@@ -22,13 +22,8 @@ export const name = 'zotero-patch-enrichment'
 export const inject: string[] = []
 
 export function apply(ctx: Context, config: { enabled?: boolean } = {}): void {
-  ctx.effect(() => {
-    ;(ctx as any).zoteroPatchEnrichment = {
-      rank: (passages: EvidenceSnippet[], query: string) =>
-        rankPassages(passages, query, config.enabled === true),
-    }
-    return () => {
-      delete (ctx as any).zoteroPatchEnrichment
-    }
+  ctx.provide('zoteroPatchEnrichment', {
+    rank: (passages: EvidenceSnippet[], query: string) =>
+      rankPassages(passages, query, config.enabled === true),
   })
 }

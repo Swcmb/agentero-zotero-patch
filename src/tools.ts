@@ -21,8 +21,8 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         tags: { type: 'array', items: { type: 'string' } },
         collection: { type: 'string' },
         qmode: { type: 'string', enum: ['metadata', 'everything'] },
-        limit: { type: 'integer', minimum: 1, maximum: 100 },
-        offset: { type: 'integer', minimum: 0 },
+        limit: { type: 'integer' },
+        offset: { type: 'integer' },
       },
       output: { schema: { type: 'object' } },
       async execute(args: any) { return researchHandlers.search(transport, args) },
@@ -30,14 +30,14 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
     defineTool({
       name: 'research_get',
       description: '按 Zotero key 读取单条文献元数据。',
-      parameters: { key: { type: 'string', minLength: 1 }, source: SOURCE_PARAM },
+      parameters: { key: { type: 'string' }, source: SOURCE_PARAM },
       async execute(args: any) { return researchHandlers.get(transport, args) },
     }),
     defineTool({
       name: 'research_get_batch',
       description: '批量读取 Zotero 条目，逐条报告成功或失败。',
       parameters: {
-        keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 50 },
+        keys: { type: 'array', items: { type: 'string' } },
         source: SOURCE_PARAM,
       },
       async execute(args: any) { return researchHandlers.getBatch(transport, args) },
@@ -67,8 +67,8 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
       description: '在 Zotero 附件全文中检索证据片段，返回可回溯到附件与页码的结果。',
       parameters: {
         key: { type: 'string', description: 'PDF 附件 key' },
-        query: { type: 'string', minLength: 1 },
-        maxSnippets: { type: 'integer', minimum: 1, maximum: 50 },
+        query: { type: 'string' },
+        maxSnippets: { type: 'integer' },
         source: SOURCE_PARAM,
       },
       async execute(args: any) { return researchHandlers.retrieve(transport, args) },
@@ -77,7 +77,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
       name: 'research_export',
       description: '按 citation/bibtex/biblatex/ris/csljson 导出 Zotero 条目。',
       parameters: {
-        keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 50 },
+        keys: { type: 'array', items: { type: 'string' } },
         format: { type: 'string', enum: ['citation', 'bibtex', 'biblatex', 'ris', 'csljson'] },
         source: SOURCE_PARAM,
       },
@@ -87,7 +87,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
       name: 'research_match_references',
       description: '按 DOI → arXiv/PMID → 标题+作者+年份 的优先级匹配参考文献。',
       parameters: {
-        targets: { type: 'array', items: { type: 'object' }, minItems: 1 },
+        targets: { type: 'array', items: { type: 'object' } },
         candidates: { type: 'array', items: { type: 'object' } },
         source: SOURCE_PARAM,
       },
@@ -97,8 +97,8 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
       name: 'research_changes',
       description: '按 since 游标读取 Zotero 文献库增量变更。',
       parameters: {
-        since: { type: 'integer', minimum: 0 },
-        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        since: { type: 'integer' },
+        limit: { type: 'integer' },
         source: SOURCE_PARAM,
       },
       async execute(args: any) { return researchHandlers.changes(transport, args) },

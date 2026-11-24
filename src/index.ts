@@ -12,12 +12,10 @@ export interface Config {
 
 export function apply(ctx: Context, config: Config = {}): void {
   const transport = new ZoteroTransport(config)
+  // Cordis 要求先 provide 再写服务属性；provide 返回的 disposer 由 fiber 自动管理。
+  ctx.provide('zoteroPatch', { transport })
   ctx.effect(() => {
     const disposeTools = registerResearchTools(ctx, transport)
-    ;(ctx as any).zoteroPatch = { transport }
-    return () => {
-      disposeTools()
-      delete (ctx as any).zoteroPatch
-    }
+    return () => disposeTools()
   })
 }

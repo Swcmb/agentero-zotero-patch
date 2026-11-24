@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { transportWith } from './mock-transport.ts'
 import { researchHandlers } from '../lib/handlers.js'
+import { ZoteroPatchError } from '../lib/errors.js'
 
 const ITEMS = [
   { key: 'VH86EE2K', data: { itemType: 'journalArticle', title: 'Paper A', creators: [{ creatorType: 'author', name: 'A B' }], date: '2020', tags: [] } },
@@ -47,4 +48,22 @@ test('researchHandlers.children 按 kind 过滤', async () => {
   const result = await researchHandlers.children(transport, { key: 'X', kind: 'attachment' })
   assert.equal(result.count, 1)
   assert.equal(result.items[0].key, 'P1')
+})
+
+// schema DSL 不支持 minimum/maximum，范围约束下沉到运行时后必须仍然生效。
+test('数值参数在运行时拒绝越界值', async () => {
+  const transport = transportWith(async () => new Response(JSON.stringify([]), { status: 200 }))
+  const badArg = (e: unknown) => e instanceof ZoteroPatchError && e.code === 'ZOTERO_PATCH_BAD_ARG'
+  await assert.rejects(() => researchHandlers.search(transport, { limit: 0 }), badArg)
+  await assert.rejects(() => researchHandlers.search(transport, { limit: 101 }), badArg)
+  await assert.rejects(() => researchHandlers.search(transport, { offset: -1 }), badArg)
+  await assert.rejects(() => researchHandlers.browse(transport, { limit: 500 }), badArg)
+  await assert.rejects(() => researchHandlers.retrieve(transport, { maxSnippets: 0 }), badArg)
+  await assert.rejects(() => researchHandlers.changes(transport, { since: -1 }), badArg)
+  await assert.rejects(() => researchHandlers.getBatch(transport, { keys: [] }), badArg)
+  await assert.rejects(() => researchHandlers.export(transport, { keys: [] }), badArg)
+  await assert.rejects(() => researchHandlers.matchReferences(transport, { targets: [] }), badArg)
+  // 合法边界仍然通过（到达 transport，返回空结果）。
+  const ok = await researchHandlers.search(transport, { limit: 100, offset: 0 })
+  assert.equal(ok.count, 0)
 })
