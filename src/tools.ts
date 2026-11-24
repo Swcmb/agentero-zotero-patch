@@ -62,6 +62,47 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
       },
       async execute(args: any) { return researchHandlers.children(transport, args) },
     }),
+    defineTool({
+      name: 'research_retrieve',
+      description: '在 Zotero 附件全文中检索证据片段，返回可回溯到附件与页码的结果。',
+      parameters: {
+        key: { type: 'string', description: 'PDF 附件 key' },
+        query: { type: 'string', minLength: 1 },
+        maxSnippets: { type: 'integer', minimum: 1, maximum: 50 },
+        source: SOURCE_PARAM,
+      },
+      async execute(args: any) { return researchHandlers.retrieve(transport, args) },
+    }),
+    defineTool({
+      name: 'research_export',
+      description: '按 citation/bibtex/biblatex/ris/csljson 导出 Zotero 条目。',
+      parameters: {
+        keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 50 },
+        format: { type: 'string', enum: ['citation', 'bibtex', 'biblatex', 'ris', 'csljson'] },
+        source: SOURCE_PARAM,
+      },
+      async execute(args: any) { return researchHandlers.export(transport, args) },
+    }),
+    defineTool({
+      name: 'research_match_references',
+      description: '按 DOI → arXiv/PMID → 标题+作者+年份 的优先级匹配参考文献。',
+      parameters: {
+        targets: { type: 'array', items: { type: 'object' }, minItems: 1 },
+        candidates: { type: 'array', items: { type: 'object' } },
+        source: SOURCE_PARAM,
+      },
+      async execute(args: any) { return researchHandlers.matchReferences(transport, args) },
+    }),
+    defineTool({
+      name: 'research_changes',
+      description: '按 since 游标读取 Zotero 文献库增量变更。',
+      parameters: {
+        since: { type: 'integer', minimum: 0 },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        source: SOURCE_PARAM,
+      },
+      async execute(args: any) { return researchHandlers.changes(transport, args) },
+    }),
   ]
   const disposers = definitions.map((d) => ctx.tools!.register(d))
   return () => disposers.forEach((dispose) => dispose())
