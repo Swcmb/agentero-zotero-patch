@@ -1,13 +1,20 @@
 # Agentero Zotero Patch — 功能融合设计规格
 
-- 日期：2026-11-21
-- 状态：已通过头脑风暴确认；经三轮自审修订（事实核对/一致性/歧义消除），待用户审阅
-- 来源设计：用户提供的 `agentero-zotero-integration-design (1).html`
-- 目标仓库：`D:/agentero-zotero-patch`（独立 Git 仓库）
+- 日期：2026-11-21（初稿）／2026-11-24（实测修正）
+- 状态：已通过头脑风暴确认；2026-11-24 依据真实仓库与真实 Zotero API 探测修订，进入实施
+- 来源设计：用户提供的 `agentero-zotero-integration-design (1).html` 与 `(2).html`
+  （两者仅一句措辞差异：(2) 在“Zotero 扩展补丁”后补了“DSH 插件”，无实质变化）
+- 目标仓库：`D:/agentero-zotero-patch`（独立 Git 仓库，2026-11-24 绑定公开远端）
+- 上游固定 commit：dsh-zotero `0ad6f59e3943afc82418360dbcc8dd8cb7e11ede`；
+  agentero-dsh-plugin `ef7f598a0ce9dabcc154d677e0ad26f09cdc64db`（2026-11-23 `git ls-remote` 实测 HEAD）
 
 ## 1. 背景与结论
 
-将 `dsh-zotero` 的 Zotero 能力整合为 `agentero-dsh-plugin` 的扩展补丁。产品形态是一个**独立安装的 DSH bundle 插件**：安装 `agentero-zotero-patch` 即通过自身 `cordis.patch.yml` 的 `insert` 把 Zotero 组件注入 DSH 运行时，自动为 `agentero-dsh` 打补丁。用户无需修改 agentero 源码，也无需并行安装 dsh-zotero。
+将 `dsh-zotero` 的 Zotero 能力整合为 `agentero-dsh-plugin` 的扩展补丁。产品形态是一个**独立安装的 DSH bundle 插件**：安装 `agentero-zotero-patch` 即通过自身 `cordis.patch.yml` 的 `insert` 把自己的组件行插入 DSH 的 composition，与 `agentero-dsh` **并列挂载**。
+
+**术语修正（2026-11-24）**：`cordis.patch.yml` 的 `insert` 语义是“向运行时 composition 插入插件行”，不是“给另一个插件打补丁”。因此本插件**不修改 agentero-dsh 的任何代码**，二者是并列关系；对 agentero 能力的复用只能通过 `ctx` 上可选探测其服务实现（“桥接”），探测失败走最小只读回退。用户无需修改 agentero 源码，也无需并行安装 dsh-zotero。
+
+**与 dsh-zotero 的关系（用户决策 2026-11-24）**：先把 dsh-zotero 作为参考插件装入 DSH desktop profile，用真实库验证其连接/检索/证据行为；确认过的逻辑再落到本 bundle。实现路径仍是抽取纯逻辑（`local/*-domain.ts` 等域模块基本不依赖 DSH，仅 2 处 `@deepseek-ai/dsh-util-values`），深耦合层（service/contract/tools/client）按统一模型重写。
 
 核心边界：Agentero Vault 继续管理 Agentero 自己的文献/笔记/PDF；Zotero 作为外部文献源经本地 API 只读访问；第一阶段只读，写入与双向同步分别设计授权机制且默认关闭；两边数据所有权各自保留。
 
@@ -20,9 +27,28 @@
 | `Vncntvx/dsh-zotero` | main，package v1.4.0 | Cordis Service 插件，提供 `ctx.zotero`；488 个源文件；4 组件（core/library/scholarly/enrichment）；`cordis.patch.yml` 用 `insert` 注入；DSH `>=0.2.2-rc.4 <0.3.0`；MIT。 |
 | `poco-ai/agentero-dsh-plugin` | main，package v0.1.8 | pnpm monorepo，四包 `host/library/notes/pdf`（`agentero-dsh-*`）；Node `>=24.9.0`，DSH `>=0.2.1-rc.5 <0.3.0`；`cordis.patch.yml` 用 `insert` 注入四个包。 |
 
-本机环境：Zotero 10.0.3 已安装（`D:/ProgramFiles/Zotero`），数据目录 `C:/Users/Swcmb/Zotero`（含真实库与 Agentero 子目录）；DSH 桌面端已安装（`D:/ProgramFiles/dsh/DeepSeek Harness.exe`）；本机 Node v22.22.2（低于源码要求，联调前需确认/切换到 Node 24）。
+本机环境（2026-11-24 复测）：Zotero **10.0.8** 已安装（`D:/ProgramFiles/Zotero`），数据目录 `C:/Users/Swcmb/Zotero`（含真实库与 Agentero 子目录）；本地 API 已在 `prefs.js` 中显式启用（`extensions.zotero.httpServer.localAPI.enabled = true`），Zotero 启动后 `127.0.0.1:23119` 正常监听。DSH 桌面端 **0.2.2-rc.5**（`D:/ProgramFiles/DSH/DeepSeek Harness.exe`），desktop profile 已装 `agentero-dsh@^0.1.8`。本机 Node v22.22.2（低于源码要求，联调前用项目内独立 Node 24）。
 
 重要约束：两仓库的版本 pin、私有路由与客户端 UI 不同，不能整体套用；核心模块体量大（`service.ts` 1283 行、`contract.ts` 1688 行、`types.ts` 1853 行），抽取纯逻辑需逐模块判断，避免把 DSH 深耦合代码搬过来。
+
+### 2.1 真实 Zotero Local API 实测（2026-11-24）
+
+对 `http://127.0.0.1:23119/api` 的实际请求结果，作为 transport 与检索设计的硬事实：
+
+| 端点 | 实测结果 |
+| --- | --- |
+| `GET /api/` | 200；响应头 `Zotero-API-Version: 3`、`Zotero-Schema-Version: 44`、`X-Zotero-Version: 10.0.8`、`Zotero-Server-ID: FBmu1pJ2JzOV` |
+| `GET /api/users/0/items?limit=1` | 200；`Total-Results: 512`；`Link` 提供 last/next/alternate；条目含 `key`/`version`/`library`/`links`/`data` |
+| `GET /api/users/0/items/top?limit=3` | 200；`Total-Results: 95`（顶层父条目，无 `parentItem`） |
+| `GET /api/users/0/items?itemType=annotation&limit=3` | 200；`Total-Results: 168`（批注作为独立 itemType） |
+| `GET /api/users/0/collections` | 200；`Total-Results: 7`，含父子层级（`parentCollection`） |
+| `GET /api/users/0/tags?limit=5` | 200；返回 `tag` + `meta` |
+| `GET /api/users/0/items/<key>/children` | 200；父条目返回附件/笔记/快照子条目（如某父条目 8 个 children：3 PDF + 3 note + 2 快照）；对附件本身返回 `[]` |
+| `GET /api/users/0/items/<attachment-key>/fulltext` | 200；返回 `{"content": "…"}`，实测含完整 PDF 抽取文本；对 note 条目返回 404 `Not found` |
+| `GET /api/users/0/items?q=contrastive&limit=3` | 200；`Total-Results: 30`（默认 qmode 只匹配标题/创建者/年份） |
+| `GET /api/users/0/items?q=contrastive&qmode=everything&limit=3` | 200；`Total-Results: 205`，但结果混入附件条目，需按 itemType/`parentItem` 过滤 |
+
+**设计影响**：`research_search` 必须默认走 `/items/top` 或对结果按 `parentItem` 过滤，避免把附件当父条目返回；`qmode=everything` 只用于全文召回阶段且需二次归一；`research_retrieve` 的 PDF 证据走附件 key 的 `/fulltext` 端点，note 无 fulltext；`research_changes` 可用响应头 `Last-Modified-Version`（实测值 44）作为游标。连接检测同时校验 `Zotero-Server-ID` 与 loopback authority，防止实例串连。
 
 ## 3. 已确认的决策
 
@@ -30,8 +56,12 @@
 | --- | --- |
 | 本次目标 | 完整实现设计文档的全部 5 个阶段 |
 | 源码审计 | 尽力拉取真实源码并审计后再迁移（已完成拉取与初步审计） |
-| 落地形式 | 独立 DSH bundle 插件，安装后自动给 agentero-dsh 打补丁 |
+| 落地形式 | 独立 DSH bundle 插件，与 agentero-dsh 并列挂载（不修改 agentero 源码） |
 | 实现路径 | 分层复用 + 分阶段推进：抽取 dsh-zotero 纯逻辑，Cordis 服务接口对接 agentero |
+| 范围（2026-11-24） | 完整 5 阶段 |
+| 与 dsh-zotero 关系（2026-11-24） | 先装 dsh-zotero 作真实库联调参考，再落地自有 bundle |
+| Node（2026-11-24） | 项目内独立 Node 24，不覆盖系统 Node |
+| 远端（2026-11-24） | `Swcmb/agentero-zotero-patch`，公开 |
 | 桥接方式 | 可选探测 `ctx` 上的 agentero 服务 + 最小只读回退，不强依赖、无版本 pin 冲突 |
 | 阶段 4 UI | 先做数据/服务层，UI 复用 agentero 现有 library 面板，不移植 dsh-zotero 客户端组件 |
 | 工具命名 | 只注册 `research_*`，不注册 `zotero_*` 别名，避免与 dsh-zotero 重名 |
@@ -133,7 +163,7 @@ Agent 调 `research_*` → 工具层参数校验 → 统一服务层按 `source`
 1. 单元测试（mock Zotero Local API）：search/get/retrieve/export/match 各模块、身份匹配三优先级、Sources 折叠幂等性。
 2. 契约测试：`research_*` 工具 schema 与返回值校验。
 3. 安全测试：loopback 限制、附件路径越界拒绝、写权限门。
-4. 真实联调（用户指定验收标准）：启动 Zotero 10.0.3 并开启本地 API → 连接检测、搜索真实库、读取详情、PDF 证据定位、引用导出；DSH 加载插件验证 `cordis.patch.yml` 注入成功。联调前确认 Node 24 可用。
+4. 真实联调（用户指定验收标准）：Zotero 10.0.8 已启动且本地 API 已监听 → 连接检测、搜索真实库、读取详情、PDF 证据定位、引用导出；DSH 加载插件验证 `cordis.patch.yml` 的 `insert` 行成功挂载。联调前确认 Node 24 可用。
 
 每阶段验收 = 类型检查通过 + 该阶段单测通过 + 对应真实 Zotero 操作可用 + Git 提交。
 
@@ -152,9 +182,14 @@ Agent 调 `research_*` → 工具层参数校验 → 统一服务层按 `source`
 - 移植 dsh-zotero 客户端 UI 组件（阶段 4 复用 agentero 面板）。
 - 任意 Shell 执行能力。
 
-## 12. 待实施计划阶段补齐
+## 12. 实施前置条件与待补齐项
 
-- 两个上游仓库的固定 commit SHA（`.sources/` 为 main 分支 zip 快照，实施计划第一步记录各仓库 HEAD SHA 并固定）。
+已完成：
+- 两个上游仓库的固定 commit SHA（见文首），`.sources/` 为 `main` 分支 zip 快照。
+- 真实 Zotero Local API 探测（§2.1），transport 与检索设计以实测为准。
+- Node 24 方案：下载 Node 24 LTS 独立目录到 `D:/agentero-zotero-patch/.node24/`（不覆盖系统 Node），本仓库脚本统一通过该目录的 node/npm 执行；Zotero 本地 API 联调不受 Node 版本影响（HTTP 调用）。
+
+待实施计划阶段补齐：
 - 逐模块能力映射表（源功能/源文件/目标包/适配方式/测试用例）。
-- **Node 24 处理（可执行步骤）**：实施计划第一步先核对构建用 Node 版本（`node --version`，PATH 中含多个 node 发行版）；若 < 24.9，则下载 Node 24 LTS 独立目录到 `D:/agentero-zotero-patch/.node24/`（不覆盖系统 Node），本仓库脚本统一通过该目录的 node/npm 执行；Zotero 本地 API 联调不受 Node 版本影响（HTTP 调用）。
 - bridge 消费 agentero 服务的具体接口面（4.3 所述）与统一面板数据契约的字段清单。
+- `research_*` 各工具的 zod 参数 schema 与返回 wire 契约。
