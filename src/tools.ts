@@ -12,11 +12,11 @@ const SOURCE_PARAM = {
 // DSH 0.2.3-alpha.2 起 defineTool 要求每个工具声明 output { schema, render }：
 // 缺少 output 会在 defineTool 内部读 options.output.render 时抛
 // "Cannot read properties of undefined (reading 'render')"。
-// 各 handler 返回形状不同（对象或数组），故用无约束 schema 接受任意 JSON 值，
-// render 以 JSON 文本把结果回传给模型。
+// 各 handler 返回形状不同（对象或数组），故用作者 DSL 的 type:'json' 接受任意
+// JSON 值（空对象 {} 在该 DSL 中会被拒绝），render 以 JSON 文本回传结果。
 function output() {
   return {
-    schema: {},
+    schema: { type: 'json' },
     render: (_args: unknown, value: unknown) => [
       { type: 'text' as const, text: JSON.stringify(value, undefined, 2) },
     ],

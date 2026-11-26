@@ -51,7 +51,7 @@ test('每个工具都声明 DSH 0.2.3 必需的 output { schema, render }', () =
   const outputCount = (source.match(/^\s*output:\s*output\(\),/gm) ?? []).length
   assert.ok(toolCount > 0, '未找到 defineTool 调用，测试需更新')
   assert.equal(outputCount, toolCount, '每个 defineTool 都必须声明 output: output()')
-  assert.match(source, /schema:\s*\{\}/, 'output() 必须声明无约束 schema')
+  assert.match(source, /schema:\s*\{\s*type:\s*['"]json['"]\s*\}/, 'output() 必须用 type:\'json\' 声明无约束 schema')
   assert.match(source, /render:\s*\([^)]*\)\s*=>/, 'output() 必须声明 render 函数')
 })
 
