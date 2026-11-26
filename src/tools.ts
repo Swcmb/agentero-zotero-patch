@@ -24,7 +24,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         limit: { type: 'integer' },
         offset: { type: 'integer' },
       },
-      output: { schema: { type: 'object' } },
+      output: { schema: { type: 'object', additionalProperties: true } },
       async execute(args: any) { return researchHandlers.search(transport, args) },
     }),
     defineTool({
@@ -87,8 +87,8 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
       name: 'research_match_references',
       description: '按 DOI → arXiv/PMID → 标题+作者+年份 的优先级匹配参考文献。',
       parameters: {
-        targets: { type: 'array', items: { type: 'object' } },
-        candidates: { type: 'array', items: { type: 'object' } },
+        targets: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        candidates: { type: 'array', items: { type: 'object', additionalProperties: true } },
         source: SOURCE_PARAM,
       },
       async execute(args: any) { return researchHandlers.matchReferences(transport, args) },

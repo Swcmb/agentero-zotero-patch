@@ -22,6 +22,27 @@ test('工具参数 schema 不含 DSH DSL 拒绝的约束关键字', () => {
   }
 })
 
+test('每个 object schema 都显式声明布尔 additionalProperties', () => {
+  // DSH 0.2.3-alpha.2 的 dsh-tools enforced JSON Schema 子集要求 object schema
+  // 必须显式给出 boolean additionalProperties，否则组件加载即抛
+  // "unsupported JSON schema: schema.additionalProperties must be explicitly true or false"。
+  // 这里用源码守卫锁住该不变量，避免未来新增工具时回归。
+  const lines = readSrc('tools.ts').split('\n')
+  const objectLineIndexes: number[] = []
+  lines.forEach((line, i) => {
+    if (/type:\s*['"]object['"]/.test(line)) objectLineIndexes.push(i)
+  })
+  assert.ok(objectLineIndexes.length > 0, '未找到任何 object schema，测试需更新')
+  for (const i of objectLineIndexes) {
+    const window = lines.slice(i, i + 4).join('\n')
+    assert.match(
+      window,
+      /additionalProperties:\s*(true|false)\b/,
+      `tools.ts:${i + 1} 的 object schema 必须显式声明 boolean additionalProperties`,
+    )
+  }
+})
+
 test('九个 research_* 工具仍全部注册', () => {
   const source = readSrc('tools.ts')
   const names = [
