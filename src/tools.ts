@@ -9,6 +9,20 @@ const SOURCE_PARAM = {
   description: '省略为跨库；zotero / agentero 为单源。agentero 未安装时指定该源会显式报错。',
 }
 
+// DSH 0.2.3-alpha.2 起 defineTool 要求每个工具声明 output { schema, render }：
+// 缺少 output 会在 defineTool 内部读 options.output.render 时抛
+// "Cannot read properties of undefined (reading 'render')"。
+// 各 handler 返回形状不同（对象或数组），故用无约束 schema 接受任意 JSON 值，
+// render 以 JSON 文本把结果回传给模型。
+function output() {
+  return {
+    schema: {},
+    render: (_args: unknown, value: unknown) => [
+      { type: 'text' as const, text: JSON.stringify(value, undefined, 2) },
+    ],
+  }
+}
+
 /** DSH 适配层：唯一 import dsh-tools 的模块，负责注册 research_* 工具。 */
 export function registerResearchTools(ctx: Context, transport: ZoteroTransport): () => void {
   const definitions = [
@@ -24,13 +38,14 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         limit: { type: 'integer' },
         offset: { type: 'integer' },
       },
-      output: { schema: { type: 'object', additionalProperties: true } },
+      output: output(),
       async execute(args: any) { return researchHandlers.search(transport, args) },
     }),
     defineTool({
       name: 'research_get',
       description: '按 Zotero key 读取单条文献元数据。',
       parameters: { key: { type: 'string' }, source: SOURCE_PARAM },
+      output: output(),
       async execute(args: any) { return researchHandlers.get(transport, args) },
     }),
     defineTool({
@@ -40,6 +55,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         keys: { type: 'array', items: { type: 'string' } },
         source: SOURCE_PARAM,
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.getBatch(transport, args) },
     }),
     defineTool({
@@ -50,6 +66,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         source: SOURCE_PARAM,
         limit: { type: 'integer' },
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.browse(transport, args) },
     }),
     defineTool({
@@ -60,6 +77,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         kind: { type: 'string', enum: ['attachment', 'note', 'annotation'] },
         source: SOURCE_PARAM,
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.children(transport, args) },
     }),
     defineTool({
@@ -71,6 +89,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         maxSnippets: { type: 'integer' },
         source: SOURCE_PARAM,
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.retrieve(transport, args) },
     }),
     defineTool({
@@ -81,6 +100,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         format: { type: 'string', enum: ['citation', 'bibtex', 'biblatex', 'ris', 'csljson'] },
         source: SOURCE_PARAM,
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.export(transport, args) },
     }),
     defineTool({
@@ -91,6 +111,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         candidates: { type: 'array', items: { type: 'object', additionalProperties: true } },
         source: SOURCE_PARAM,
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.matchReferences(transport, args) },
     }),
     defineTool({
@@ -101,6 +122,7 @@ export function registerResearchTools(ctx: Context, transport: ZoteroTransport):
         limit: { type: 'integer' },
         source: SOURCE_PARAM,
       },
+      output: output(),
       async execute(args: any) { return researchHandlers.changes(transport, args) },
     }),
   ]

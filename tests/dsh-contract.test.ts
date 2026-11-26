@@ -43,6 +43,18 @@ test('每个 object schema 都显式声明布尔 additionalProperties', () => {
   }
 })
 
+test('每个工具都声明 DSH 0.2.3 必需的 output { schema, render }', () => {
+  // defineTool 会无条件读取 options.output.render；缺少 output 时组件加载
+  // 直接抛 "Cannot read properties of undefined (reading 'render')"。
+  const source = readSrc('tools.ts')
+  const toolCount = (source.match(/defineTool\(\{/g) ?? []).length
+  const outputCount = (source.match(/^\s*output:\s*output\(\),/gm) ?? []).length
+  assert.ok(toolCount > 0, '未找到 defineTool 调用，测试需更新')
+  assert.equal(outputCount, toolCount, '每个 defineTool 都必须声明 output: output()')
+  assert.match(source, /schema:\s*\{\}/, 'output() 必须声明无约束 schema')
+  assert.match(source, /render:\s*\([^)]*\)\s*=>/, 'output() 必须声明 render 函数')
+})
+
 test('九个 research_* 工具仍全部注册', () => {
   const source = readSrc('tools.ts')
   const names = [
